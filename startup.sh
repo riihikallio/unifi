@@ -118,7 +118,7 @@ if [ "x$unifi" != "xinstall ok installed" ]; then
 	apt-get -qq install -y unifi
 	echo "Unifi installed" >> $LOG
 	systemctl disable mongodb
-	fi
+fi
 
 #
 # Set up unattended upgrades with automatic reboots
@@ -264,8 +264,8 @@ if [ -f /etc/letsencrypt/live/${dnsname}/privkey.pem ] \\
 	-caname root -name unifi
 	x=\$?
 	if [ ! "\$x" ]; then
-		systemctl start unifi
 		echo "OpenSSL export failed" >> $LOG
+		systemctl start unifi
 		exit 1
 	fi
 	
@@ -274,8 +274,8 @@ if [ -f /etc/letsencrypt/live/${dnsname}/privkey.pem ] \\
 	-deststorepass aircontrolenterprise
 	x=\$?
 	if [ ! "\$x" ]; then
-		systemctl start unifi
 		echo "KeyTool delete failed" >> $LOG
+		systemctl start unifi
 		exit 2
 	fi
 	
@@ -288,8 +288,8 @@ if [ -f /etc/letsencrypt/live/${dnsname}/privkey.pem ] \\
 	-alias unifi -trustcacerts
 	x=\$?
 	if [ ! "\$x" ]; then
-		systemctl start unifi
 		echo "KeyTool import failed" >> $LOG
+		systemctl start unifi
 		exit 3
 	fi
 	
@@ -299,8 +299,8 @@ if [ -f /etc/letsencrypt/live/${dnsname}/privkey.pem ] \\
 	/var/lib/unifi/ca_chain.pem
 	x=\$?
 	if [ ! "\$x" ]; then
-		systemctl start unifi
 		echo "Java import_cert failed" >> $LOG
+		systemctl start unifi
 		exit 4
 	fi
 	

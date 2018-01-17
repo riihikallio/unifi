@@ -117,6 +117,7 @@ unifi=$(dpkg-query -W --showformat='${Status}\n' unifi | grep "install ok instal
 if [ "x$unifi" != "xinstall ok installed" ]; then
 	apt-get -qq install -y unifi
 	echo "Unifi installed" >> $LOG
+	systemctl stop mongodb
 	systemctl disable mongodb
 fi
 

@@ -54,8 +54,8 @@ fi
 #
 tz=$(curl -fs -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/attributes/timezone")
 if [ $tz ] && [ -f /usr/share/zoneinfo/${tz} ]; then
-	rm -f /etc/localtime
-	ln -s /usr/share/zoneinfo/${tz} /etc/localtime
+	apt-get -qq install -y dbus
+	timedatectl set-timezone $tz
 	echo "Localtime set to ${tz}" >> $LOG
 fi
 
@@ -115,13 +115,12 @@ _EOF
 [unifi-controller]
 filter   = unifi-controller
 port     = 8443
-action   = iptables-multiport[name=unifi, port=8443, protocol=tcp]
 logpath  = /var/log/unifi/server.log
 _EOF
 	fi
 	cat > /etc/fail2ban/jail.d/unifi-controller.local <<_EOF
 [unifi-controller]
-enabled  = true
+enabled  = false
 maxretry = 3
 bantime  = 3600
 findtime = 3600

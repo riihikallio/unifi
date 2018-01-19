@@ -103,17 +103,45 @@ _EOF
 	echo "Lighttpd installed" >> $LOG
 fi
 
-haveged=$(dpkg-query -W --showformat='${Status}\n' haveged | grep "install ok installed")
+fail2ban=$(dpkg-query -W --showformat='${Status}\n' fail2ban)
+if [ "x$fail2ban" != "xinstall ok installed" ]; then 
+	apt-get -qq install -y fail2ban
+	if [ ! -f /etc/fail2ban/filter.d/unifi-controller.conf ]; then
+		cat > /etc/fail2ban/filter.d/unifi-controller.conf <<_EOF
+[Definition]
+failregex = ^.* Failed .* login for .* from <HOST>\s*$
+_EOF
+		cat > /etc/fail2ban/jail.d/unifi-controller.conf <<_EOF
+[unifi-controller]
+filter   = unifi-controller
+port     = 8443
+action   = iptables-multiport[name=unifi, port=8443, protocol=tcp]
+logpath  = /var/log/unifi/server.log
+_EOF
+	fi
+	cat > /etc/fail2ban/jail.d/unifi-controller.local <<_EOF
+[unifi-controller]
+enabled  = true
+maxretry = 3
+bantime  = 3600
+findtime = 3600
+_EOF
+	systemctl reload-or-restart fail2ban
+	echo "Fail2Ban installed" >> $LOG
+fi
+
+
+haveged=$(dpkg-query -W --showformat='${Status}\n' haveged)
 if [ "x$haveged" != "xinstall ok installed" ]; then 
 	apt-get -qq install -y haveged
 	echo "Haveged installed" >> $LOG
 	fi
-certbot=$(dpkg-query -W --showformat='${Status}\n' certbot | grep "install ok installed")
+certbot=$(dpkg-query -W --showformat='${Status}\n' certbot)
 if [ "x$certbot" != "xinstall ok installed" ]; then
 	apt-get -qq install -y -t ${release}-backports certbot
 	echo "CertBot installed from ${release}-backports" >> $LOG
 	fi
-unifi=$(dpkg-query -W --showformat='${Status}\n' unifi | grep "install ok installed")
+unifi=$(dpkg-query -W --showformat='${Status}\n' unifi)
 if [ "x$unifi" != "xinstall ok installed" ]; then
 	apt-get -qq install -y unifi
 	echo "Unifi installed" >> $LOG

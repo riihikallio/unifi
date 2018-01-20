@@ -7,20 +7,18 @@
 # (c) 2018 Petri Riihikallio Metis Oy
 
 #
-# Set up logging
+# Set up logging unattended scripts
 #
-LOG="/var/log/gcp-unifi.log"
-echo >> $LOG
-echo "Startup on $(date)" >> $LOG
+LOG="/var/log/unifi/gcp-unifi.log"
 if [ ! -f /etc/logrotate.d/gcp-unifi.conf ]; then
 	cat > /etc/logrotate.d/gcp-unifi.conf <<_EOF
-/var/log/gcp-unifi.log {
-weekly
+$LOG {
+monthly
 rotate 4
 compress
 }
 _EOF
-	echo "Logrotate set up" >> $LOG
+	echo "Logrotate set up"
 fi
 
 #
@@ -29,7 +27,7 @@ fi
 ddns=$(curl -fs -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/attributes/ddns-url")
 if [ $ddns ]; then
 	curl -fs $ddns
-	echo "Dynamic DNS accessed" >> $LOG
+	echo "Dynamic DNS accessed"
 	fi
 
 #
@@ -37,15 +35,14 @@ if [ $ddns ]; then
 #
 if [ ! -f /swapfile ]; then
 	memory=$(free -m | grep "^Mem:" | tr -s " " | cut -d " " -f 2)
-	echo "${memory} megabytes of memory" >> $LOG
+	echo "${memory} megabytes of memory detected"
 	if [ -z "$memory" ] || [ "$memory" -lt "4096" ]; then
 		fallocate -l 4G /swapfile
 		chmod 600 /swapfile
-		mkswap /swapfile
+		mkswap /swapfile >/dev/null
 		swapon /swapfile
-		cp /etc/fstab /etc/fstab.bak
 		echo '/swapfile none swap sw 0 0' >> /etc/fstab
-		echo "Swap file created" >> $LOG
+		echo "Swap file created"
 	fi
 fi
 
@@ -54,9 +51,14 @@ fi
 #
 tz=$(curl -fs -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/attributes/timezone")
 if [ $tz ] && [ -f /usr/share/zoneinfo/${tz} ]; then
-	apt-get -qq install -y dbus
-	timedatectl set-timezone $tz
-	echo "Localtime set to ${tz}" >> $LOG
+	apt-get -qq install -y dbus >/dev/null
+	if ! systemctl start dbus; then
+		echo "Trying to start dbus"
+		sleep 15
+		systemctl start dbus
+	fi
+	if timedatectl set-timezone $tz; then echo "Localtime set to ${tz}"; fi
+	systemctl restart rsyslog
 fi
 
 #
@@ -65,7 +67,7 @@ fi
 if [ ! -f /etc/apt/trusted.gpg.d/unifi-repo.gpg ]; then
 	echo "deb http://www.ubnt.com/downloads/unifi/debian stable ubiquiti" > /etc/apt/sources.list.d/unifi.list
 	curl -fs -o /etc/apt/trusted.gpg.d/unifi-repo.gpg https://dl.ubnt.com/unifi/unifi-repo.gpg
-	if [ $? ]; then echo "Unifi added to APT sources" >> $LOG; fi
+	if [ $? ]; then echo "Unifi added to APT sources"; fi
 fi
 
 #
@@ -77,21 +79,42 @@ if [ ! -f /etc/apt/sources.list.d/backports.list ]; then
 deb http://deb.debian.org/debian/ ${release}-backports main
 deb-src http://deb.debian.org/debian/ ${release}-backports main
 _EOF
-	echo "Backports (${release}) added to APT sources" >> $LOG
+	echo "Backports (${release}) added to APT sources"
 fi
 
 #
 # Install stuff
 #
-apt-get -qq update
+apt-get -qq update >/dev/null
 if [ ! -f /var/run/apt-upgraded ]; then
-	apt-get -qq upgrade -y
+	apt-get -qq upgrade -y >/dev/null
 	touch /var/run/apt-upgraded
+	echo "System upgraded"
 fi
 
-httpd=$(dpkg-query -W --showformat='${Status}\n' lighttpd)
+# Simple installs first
+haveged=$(dpkg-query -W --showformat='${Status}\n' haveged 2>/dev/null)
+if [ "x$haveged" != "xinstall ok installed" ]; then 
+	apt-get -qq install -y haveged >/dev/null
+	echo "Haveged installed"
+	fi
+certbot=$(dpkg-query -W --showformat='${Status}\n' certbot 2>/dev/null)
+if [ "x$certbot" != "xinstall ok installed" ]; then
+	apt-get -qq install -y -t ${release}-backports certbot >/dev/null
+	echo "CertBot installed from ${release}-backports"
+	fi
+unifi=$(dpkg-query -W --showformat='${Status}\n' unifi 2>/dev/null)
+if [ "x$unifi" != "xinstall ok installed" ]; then
+	apt-get -qq install -y unifi >/dev/null
+	echo "Unifi installed"
+	systemctl stop mongodb
+	systemctl disable mongodb
+fi
+
+# Lighttpd needs a config file and a reload
+httpd=$(dpkg-query -W --showformat='${Status}\n' lighttpd 2>/dev/null)
 if [ "x$httpd" != "xinstall ok installed" ]; then
-	apt-get -qq install -y lighttpd
+	apt-get -qq install -y lighttpd >/dev/null
 	cat > /etc/lighttpd/conf-enabled/10-unifi-redirect.conf <<_EOF
 \$HTTP["scheme"] == "http" {
     \$HTTP["host"] =~ ".*" {
@@ -100,12 +123,13 @@ if [ "x$httpd" != "xinstall ok installed" ]; then
 }
 _EOF
 	systemctl reload-or-restart lighttpd
-	echo "Lighttpd installed" >> $LOG
+	echo "Lighttpd installed"
 fi
 
-fail2ban=$(dpkg-query -W --showformat='${Status}\n' fail2ban)
+# Fail2Ban needs three files and a reload
+fail2ban=$(dpkg-query -W --showformat='${Status}\n' fail2ban 2>/dev/null)
 if [ "x$fail2ban" != "xinstall ok installed" ]; then 
-	apt-get -qq install -y fail2ban
+	apt-get -qq install -y fail2ban >/dev/null
 	if [ ! -f /etc/fail2ban/filter.d/unifi-controller.conf ]; then
 		cat > /etc/fail2ban/filter.d/unifi-controller.conf <<_EOF
 [Definition]
@@ -118,34 +142,16 @@ port     = 8443
 logpath  = /var/log/unifi/server.log
 _EOF
 	fi
+	# The .local file will be installed in any case
 	cat > /etc/fail2ban/jail.d/unifi-controller.local <<_EOF
 [unifi-controller]
-enabled  = false
+enabled  = true
 maxretry = 3
 bantime  = 3600
 findtime = 3600
 _EOF
 	systemctl reload-or-restart fail2ban
-	echo "Fail2Ban installed" >> $LOG
-fi
-
-
-haveged=$(dpkg-query -W --showformat='${Status}\n' haveged)
-if [ "x$haveged" != "xinstall ok installed" ]; then 
-	apt-get -qq install -y haveged
-	echo "Haveged installed" >> $LOG
-	fi
-certbot=$(dpkg-query -W --showformat='${Status}\n' certbot)
-if [ "x$certbot" != "xinstall ok installed" ]; then
-	apt-get -qq install -y -t ${release}-backports certbot
-	echo "CertBot installed from ${release}-backports" >> $LOG
-	fi
-unifi=$(dpkg-query -W --showformat='${Status}\n' unifi)
-if [ "x$unifi" != "xinstall ok installed" ]; then
-	apt-get -qq install -y unifi
-	echo "Unifi installed" >> $LOG
-	systemctl stop mongodb
-	systemctl disable mongodb
+	echo "Fail2Ban installed"
 fi
 
 #
@@ -162,7 +168,7 @@ Unattended-Upgrade::Automatic-Reboot "true";
 Unattended-Upgrade::Automatic-Reboot-Time "03:21";
 _EOF
 	systemctl reload-or-restart unattended-upgrades
-	echo "Unattended upgrades set up" >> $LOG
+	echo "Unattended upgrades set up"
 fi
 
 #
@@ -202,7 +208,7 @@ ExecStart=/usr/local/sbin/unifidb-repair.sh
 WantedBy=multi-user.target
 _EOF
 	systemctl enable unifidb-repair.service
-	echo "Unifi DB autorepair set up" >> $LOG
+	echo "Unifi DB autorepair set up"
 fi
 
 #
@@ -219,6 +225,7 @@ RandomizedDelaySec=6h
 [Install]
 WantedBy=timers.target
 _EOF
+	systemctl daemon-reload
 	cat > /etc/systemd/system/unifi-backup.service <<_EOF
 [Unit]
 Description=Daily backup to ${bucket} service
@@ -230,24 +237,15 @@ ExecStart=/usr/bin/gsutil rsync -r -d /var/lib/unifi/backup gs://$bucket
 _EOF
 	systemctl start unifi-backup.timer
 	systemctl enable unifi-backup.timer
-	echo "Backups to ${bucket} set up" >> $LOG
+	echo "Backups to ${bucket} set up"
 fi
 
 #
 # Set up Let's Encrypt
 #
-dnsname=$(curl -fs -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/attributes/dns-name")
-extIP=$(curl -fs -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip")
-dnsIP=$(getent hosts $dnsname | cut -d " " -f 1)
-if [ $dnsname ] && [ $extIP = $dnsIP ] && [ ! -d /etc/letsencrypt/live/${dnsname} ]; then
-	systemctl stop lighttpd
-    x=$(certbot certonly -d $dnsname --standalone --agree-tos --register-unsafely-without-email)
-	systemctl start lighttpd
-	if [ "$x" ]; then echo "Received certifacate for ${dnsname}" >> $LOG
-		else echo "CertBot failed for ${dnsname}" >> $LOG; exit 1;
-	fi
-		
-	# Write the cross signed certificate to disk
+
+# Write the cross signed certificate to disk
+if [ ! -f /var/lib/unifi/ca_chain.pem ]; then
 	cat > /var/lib/unifi/ca_chain.pem <<_EOF
 -----BEGIN CERTIFICATE-----
 MIIDSjCCAjKgAwIBAgIQRK+wgNajJ7qJMDmGLvhAazANBgkqhkiG9w0BAQUFADA/
@@ -270,8 +268,10 @@ JDGFoqgCWjBH4d1QB7wCCZAA62RjYJsWvIjJEubSfZGL+T0yjWW06XyxV3bqxbYo
 Ob8VZRzI9neWagqNdwvYkQsEjgfbKbYK7p2CNTUQ
 -----END CERTIFICATE-----
 _EOF
+fi
 
-	# Write the deploy hook to import the cert into Java
+# Write the deploy hook to import the cert into Java
+if [ ! -f /etc/letsencrypt/renewal-hooks/deploy/unifi ]; then
 	cat > /etc/letsencrypt/renewal-hooks/deploy/unifi <<_EOF
 #! /bin/sh
 
@@ -284,49 +284,41 @@ if [ -f /etc/letsencrypt/live/${dnsname}/privkey.pem ] \\
 	echo "Importing new certificate on \$(date)" >> $LOG
 	systemctl stop unifi
 	
-	openssl pkcs12 -export \\
+	if ! openssl pkcs12 -export \\
 	-in /etc/letsencrypt/live/${dnsname}/cert.pem \\
 	-inkey /etc/letsencrypt/live/${dnsname}/privkey.pem \\
-	-CAfile /etc/letsencrypt/live/${dnsname}/cert.pem \\
+	-CAfile /etc/letsencrypt/live/${dnsname}/chain.pem \\
 	-out \${p12} -passout pass:aircontrolenterprise \\
-	-caname root -name unifi
-	x=\$?
-	if [ ! "\$x" ]; then
+	-caname root -name unifi >/dev/null ; then
 		echo "OpenSSL export failed" >> $LOG
 		systemctl start unifi
 		exit 1
 	fi
 	
-	keytool -delete -alias unifi \\
+	if ! keytool -delete -alias unifi \\
 	-keystore /var/lib/unifi/keystore \\
-	-deststorepass aircontrolenterprise
-	x=\$?
-	if [ ! "\$x" ]; then
+	-deststorepass aircontrolenterprise >/dev/null ; then
 		echo "KeyTool delete failed" >> $LOG
 		systemctl start unifi
 		exit 2
 	fi
 	
-	keytool -importkeystore \\
+	if ! keytool -importkeystore \\
 	-srckeystore \${p12} -srcstoretype PKCS12 \\
 	-srcstorepass aircontrolenterprise \\
 	-destkeystore /var/lib/unifi/keystore \\
 	-deststorepass aircontrolenterprise \\
 	-destkeypass aircontrolenterprise \\
-	-alias unifi -trustcacerts
-	x=\$?
-	if [ ! "\$x" ]; then
+	-alias unifi -trustcacerts >/dev/null; then
 		echo "KeyTool import failed" >> $LOG
 		systemctl start unifi
 		exit 3
 	fi
 	
-	java -jar /usr/lib/unifi/lib/ace.jar import_cert \\
+	if ! java -jar /usr/lib/unifi/lib/ace.jar import_cert \\
 	/etc/letsencrypt/live/${dnsname}/cert.pem \\
-	/etc/letsencrypt/live/${dnsname}/cert.pem \\
-	/var/lib/unifi/ca_chain.pem
-	x=\$?
-	if [ ! "\$x" ]; then
+	/etc/letsencrypt/live/${dnsname}/chain.pem \\
+	/var/lib/unifi/ca_chain.pem >/dev/null; then
 		echo "Java import_cert failed" >> $LOG
 		systemctl start unifi
 		exit 4
@@ -338,6 +330,20 @@ if [ -f /etc/letsencrypt/live/${dnsname}/privkey.pem ] \\
 fi
 _EOF
 	chmod a+x /etc/letsencrypt/renewal-hooks/deploy/unifi
-	# Run the deploy hook once to import the first cert
-	/etc/letsencrypt/renewal-hooks/deploy/unifi
+fi
+
+# Acquire the first certificate
+dnsname=$(curl -fs -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/attributes/dns-name")
+extIP=$(curl -fs -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip")
+dnsIP=$(getent hosts $dnsname | cut -d " " -f 1)
+if [ $dnsname ] && [ $extIP = $dnsIP ] && [ ! -d /etc/letsencrypt/live/${dnsname} ]; then
+	systemctl stop lighttpd
+    x=$(certbot certonly -d $dnsname --standalone --agree-tos --register-unsafely-without-email >/dev/null)
+	systemctl start lighttpd
+	if [ "$x" ]; then 
+		echo "Received certifacate for ${dnsname}"
+		/etc/letsencrypt/renewal-hooks/deploy/unifi
+	else
+		else echo "CertBot failed for ${dnsname}"; exit 1;
+	fi
 fi

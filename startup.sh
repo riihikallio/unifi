@@ -342,7 +342,7 @@ if [ $dnsname ] && [ $extIP = $dnsIP ] && [ ! -d /etc/letsencrypt/live/${dnsname
 	systemctl start lighttpd
 	if [ "$x" ]; then 
 		echo "Received certifacate for ${dnsname}"
-		/etc/letsencrypt/renewal-hooks/deploy/unifi
+#		/etc/letsencrypt/renewal-hooks/deploy/unifi
 	else
 		else echo "CertBot failed for ${dnsname}"; exit 1;
 	fi

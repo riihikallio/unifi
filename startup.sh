@@ -28,7 +28,7 @@ ddns=$(curl -fs -H "Metadata-Flavor: Google" "http://metadata.google.internal/co
 if [ $ddns ]; then
 	curl -fs $ddns
 	echo "Dynamic DNS accessed"
-	fi
+fi
 
 #
 # Create a swap file for small memory instances
@@ -67,7 +67,7 @@ fi
 if [ ! -f /etc/apt/trusted.gpg.d/unifi-repo.gpg ]; then
 	echo "deb http://www.ubnt.com/downloads/unifi/debian stable ubiquiti" > /etc/apt/sources.list.d/unifi.list
 	curl -fs -o /etc/apt/trusted.gpg.d/unifi-repo.gpg https://dl.ubnt.com/unifi/unifi-repo.gpg
-	if [ $? ]; then echo "Unifi added to APT sources"; fi
+	echo "Unifi added to APT sources";
 fi
 
 #
@@ -221,7 +221,7 @@ if [ $bucket ]; then
 Description=Daily backup to ${bucket} timer
 [Timer]
 OnCalendar=daily
-RandomizedDelaySec=6h
+RandomizedDelaySec=2h
 [Install]
 WantedBy=timers.target
 _EOF
@@ -243,10 +243,17 @@ fi
 #
 # Set up Let's Encrypt
 #
+dnsname=$(curl -fs -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/attributes/dns-name")
+if [ ! $dnsname ]; then exit 0; fi
+privkey=/etc/letsencrypt/live/${dnsname}/privkey.pem
+pubcrt=/etc/letsencrypt/live/${dnsname}/cert.pem
+chain=/etc/letsencrypt/live/${dnsname}/chain.pem
+caroot=/var/lib/ca_root.pem
 
-# Write the cross signed certificate to disk
-if [ ! -f /var/lib/unifi/ca_chain.pem ]; then
-	cat > /var/lib/unifi/ca_chain.pem <<_EOF
+
+# Write the cross signed root certificate to disk
+if [ ! -f $caroot ]; then
+	cat > $caroot <<_EOF
 -----BEGIN CERTIFICATE-----
 MIIDSjCCAjKgAwIBAgIQRK+wgNajJ7qJMDmGLvhAazANBgkqhkiG9w0BAQUFADA/
 MSQwIgYDVQQKExtEaWdpdGFsIFNpZ25hdHVyZSBUcnVzdCBDby4xFzAVBgNVBAMT
@@ -271,13 +278,13 @@ _EOF
 fi
 
 # Write the deploy hook to import the cert into Java
-if [ ! -f /etc/letsencrypt/renewal-hooks/deploy/unifi ]; then
-	cat > /etc/letsencrypt/renewal-hooks/deploy/unifi <<_EOF
+if [ ! -d /etc/letsencrypt/renewal-hooks/deploy ]; then
+	mkdir -p /etc/letsencrypt/renewal-hooks/deploy
+fi
+cat > /etc/letsencrypt/renewal-hooks/deploy/unifi <<_EOF
 #! /bin/sh
 
-if [ -f /etc/letsencrypt/live/${dnsname}/privkey.pem ] \\
-	&& [ -f /etc/letsencrypt/live/${dnsname}/cert.pem ] \\
-	&& [ -f /etc/letsencrypt/live/${dnsname}/cert.pem ]; then
+if [ -f $privkey ] && [ -f $pubcrt ] && [ -f $chain ]; then
 
 	p12=\$(mktemp)
 	echo >> $LOG
@@ -285,9 +292,9 @@ if [ -f /etc/letsencrypt/live/${dnsname}/privkey.pem ] \\
 	systemctl stop unifi
 	
 	if ! openssl pkcs12 -export \\
-	-in /etc/letsencrypt/live/${dnsname}/cert.pem \\
-	-inkey /etc/letsencrypt/live/${dnsname}/privkey.pem \\
-	-CAfile /etc/letsencrypt/live/${dnsname}/chain.pem \\
+	-in $pubcrt \\
+	-inkey $privkey \\
+	-CAfile $chain \\
 	-out \${p12} -passout pass:aircontrolenterprise \\
 	-caname root -name unifi >/dev/null ; then
 		echo "OpenSSL export failed" >> $LOG
@@ -299,8 +306,6 @@ if [ -f /etc/letsencrypt/live/${dnsname}/privkey.pem ] \\
 	-keystore /var/lib/unifi/keystore \\
 	-deststorepass aircontrolenterprise >/dev/null ; then
 		echo "KeyTool delete failed" >> $LOG
-		systemctl start unifi
-		exit 2
 	fi
 	
 	if ! keytool -importkeystore \\
@@ -312,38 +317,80 @@ if [ -f /etc/letsencrypt/live/${dnsname}/privkey.pem ] \\
 	-alias unifi -trustcacerts >/dev/null; then
 		echo "KeyTool import failed" >> $LOG
 		systemctl start unifi
-		exit 3
+		exit 2
 	fi
 	
 	if ! java -jar /usr/lib/unifi/lib/ace.jar import_cert \\
-	/etc/letsencrypt/live/${dnsname}/cert.pem \\
-	/etc/letsencrypt/live/${dnsname}/chain.pem \\
-	/var/lib/unifi/ca_chain.pem >/dev/null; then
+	$pubcrt $chain $caroot >/dev/null; then
 		echo "Java import_cert failed" >> $LOG
 		systemctl start unifi
-		exit 4
+		exit 3
 	fi
 	
 	rm -f \${p12}
 	systemctl start unifi
 	echo "Success" >> $LOG
+else
+	echo "Certificate files missing" >> $LOG
+	exit 4
 fi
 _EOF
-	chmod a+x /etc/letsencrypt/renewal-hooks/deploy/unifi
-fi
+chmod a+x /etc/letsencrypt/renewal-hooks/deploy/unifi
 
-# Acquire the first certificate
-dnsname=$(curl -fs -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/attributes/dns-name")
-extIP=$(curl -fs -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip")
-dnsIP=$(getent hosts $dnsname | cut -d " " -f 1)
-if [ $dnsname ] && [ $extIP = $dnsIP ] && [ ! -d /etc/letsencrypt/live/${dnsname} ]; then
+# Write a script to acquire the first certificate (for a systemd timer)
+cat > /usr/local/sbin/certbotrun.sh <<_EOF
+#! /bin/sh
+extIP=\$(curl -fs -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip")
+dnsIP=\$(getent hosts $dnsname | cut -d " " -f 1)
+
+if [ \$extIP = \$dnsIP ] && [ ! -d /etc/letsencrypt/live/${dnsname} ]; then
+	echo >> $LOG
+	echo "CertBot run on \$(date)" >> $LOG
 	systemctl stop lighttpd
-    x=$(certbot certonly -d $dnsname --standalone --agree-tos --register-unsafely-without-email >/dev/null)
+	certbot certonly -d $dnsname --standalone --agree-tos --register-unsafely-without-email >> $LOG
+	rc=\$?
 	systemctl start lighttpd
-	if [ "$x" ]; then 
-		echo "Received certifacate for ${dnsname}"
-#		/etc/letsencrypt/renewal-hooks/deploy/unifi
+	if [ "\$rc" = 0 ]; then 
+		echo "Received certifacate for ${dnsname}" >> $LOG
+		/etc/letsencrypt/renewal-hooks/deploy/unifi
+		systemctl stop certbotrun.timer
 	else
-		else echo "CertBot failed for ${dnsname}"; exit 1;
+		echo "CertBot failed for ${dnsname}" >> $LOG
+		exit 1
+	fi
+else
+	echo "Skipping CertBot run" >> $LOG
+	exit 2
+fi
+_EOF
+chmod a+x /usr/local/sbin/certbotrun.sh
+
+# Write the systemd unit files
+cat > /etc/systemd/system/certbotrun.timer <<_EOF
+[Unit]
+Description=Run CertBot hourly until success
+[Timer]
+OnCalendar=hourly
+RandomizedDelaySec=10m
+[Install]
+WantedBy=timers.target
+_EOF
+systemctl daemon-reload
+
+cat > /etc/systemd/system/certbotrun.service <<_EOF
+[Unit]
+Description=Run CertBot hourly until success
+After=network-online.target
+Wants=network-online.target
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/certbotrun.sh
+_EOF
+
+if [ ! -d /etc/letsencrypt/live/${dnsname} ]; then
+	if ! /usr/local/sbin/certbotrun.sh; then
+		echo "Installing hourly CertBot run"
+		systemctl start certbotrun.timer
 	fi
 fi
+

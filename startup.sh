@@ -74,6 +74,7 @@ if [ ! -f /swapfile ]; then
 		swapon /swapfile
 		echo '/swapfile none swap sw 0 0' >> /etc/fstab
 		echo 'tmpfs /run tmpfs rw,nodev,nosuid,size=400M 0 0' >> /etc/fstab
+		mount -o remount,rw,nodev,nosuid,size=400M tmpfs /run
 		echo "Swap file created"
 	fi
 fi

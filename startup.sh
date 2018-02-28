@@ -62,7 +62,7 @@ fi
 
 ###########################################################
 #
-# Create a swap file for small memory instances
+# Create a swap file for small memory instances and increase /run
 #
 if [ ! -f /swapfile ]; then
 	memory=$(free -m | grep "^Mem:" | tr -s " " | cut -d " " -f 2)
@@ -73,6 +73,7 @@ if [ ! -f /swapfile ]; then
 		mkswap /swapfile >/dev/null
 		swapon /swapfile
 		echo '/swapfile none swap sw 0 0' >> /etc/fstab
+		echo 'tmpfs /run tmpfs rw,nodev,nosuid,size=400M 0 0' >> /etc/fstab
 		echo "Swap file created"
 	fi
 fi
@@ -314,7 +315,7 @@ fi
 #	 else
 #	 	echo "unifi.xms=${xms}" >>/var/lib/unifi/system.properties
 #	 fi
-#	 adjust=" xms=${xms}"
+#	 message=" xms=${xms}"
 #	 
 #	 xmx=$(curl -fs -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/attributes/xmx")
 #	 if [ "0${xmx}" -lt 100 ]; then then xmx=1024; fi
@@ -324,10 +325,10 @@ fi
 #	 else
 #	 	echo "unifi.xmx=${xmx}" >>/var/lib/unifi/system.properties
 #	 fi
-#	 adjust="${adjust} xmx=${xmx}"
+#	 message="${message} xmx=${xmx}"
 #	 
-#	 if [ "${adjust}" ]; then
-#	 	echo "Java heap set to:${adjust}"
+#	 if [ "${message}" ]; then
+#	 	echo "Java heap set to:${message}"
 #	 fi
 #	 systemctl restart unifi
 # fi
@@ -454,7 +455,8 @@ _EOF
 chmod a+x /usr/local/sbin/certbotrun.sh
 
 # Write the systemd unit files
-cat > /etc/systemd/system/certbotrun.timer <<_EOF
+if [ ! -f /etc/systemd/system/certbotrun.timer ]; then
+	cat > /etc/systemd/system/certbotrun.timer <<_EOF
 [Unit]
 Description=Run CertBot hourly until success
 [Timer]
@@ -463,9 +465,9 @@ RandomizedDelaySec=15m
 [Install]
 WantedBy=timers.target
 _EOF
-systemctl daemon-reload
+	systemctl daemon-reload
 
-cat > /etc/systemd/system/certbotrun.service <<_EOF
+	cat > /etc/systemd/system/certbotrun.service <<_EOF
 [Unit]
 Description=Run CertBot hourly until success
 After=network-online.target
@@ -474,6 +476,7 @@ Wants=network-online.target
 Type=oneshot
 ExecStart=/usr/local/sbin/certbotrun.sh
 _EOF
+fi
 
 # Start the above
 if [ ! -d /etc/letsencrypt/live/${dnsname} ]; then

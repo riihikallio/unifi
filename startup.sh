@@ -1,6 +1,6 @@
 #! /bin/sh
 
-# Version 1.0.2
+# Version 1.0.3
 # This is a startup script for UniFi Controller on Debian based Google Compute Engine instances.
 # For instructions and how-to:  https://metis.fi/en/2018/02/unifi-on-gcp/
 # For comments and code walkthrough:  https://metis.fi/en/2018/02/gcp-unifi-code/
@@ -405,7 +405,6 @@ if [ -e $privkey ] && [ -e $pubcrt ] && [ -e $chain ]; then
 	-srcstoretype pkcs12 \\
 	-srcstorepass aircontrolenterprise \\
 	-destkeystore /var/lib/unifi/keystore \\
-	-deststoretype pkcs12 \\
 	-deststorepass aircontrolenterprise \\
 	-destkeypass aircontrolenterprise \\
 	-alias unifi -trustcacerts >/dev/null; then

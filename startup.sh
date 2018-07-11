@@ -1,6 +1,6 @@
 #! /bin/sh
 
-# Version 1.2.1
+# Version 1.2.2
 # This is a startup script for UniFi Controller on Debian based Google Compute Engine instances.
 # For instructions and how-to:  https://metis.fi/en/2018/02/unifi-on-gcp/
 # For comments and code walkthrough:  https://metis.fi/en/2018/02/gcp-unifi-code/
@@ -325,7 +325,7 @@ fi
 #	 fi
 #	 message=" xms=${xms}"
 #	 
-#	 if [ "0${xmx}" -lt "${xms}" ]; then xmx=${xms}
+#	 if [ "0${xmx}" -lt "${xms}" ]; then xmx=${xms}; fi
 #	 if grep -e "^\s*unifi.xmx=[0-9]" /var/lib/unifi/system.properties >/dev/null; then
 #	 	sed -i -e "s/^[[:space:]]*unifi.xmx=[[:digit:]]\+/unifi.xmx=${xmx}/" /var/lib/unifi/system.properties
 #	 else
@@ -333,7 +333,7 @@ fi
 #	 fi
 #	 message="${message} xmx=${xmx}"
 #	 
-#	 if [ "${message}" ]; then
+#	 if [ -n "${message}" ]; then
 #	 	echo "Java heap set to:${message}"
 #	 fi
 #	 systemctl restart unifi
@@ -411,7 +411,6 @@ if [ -e $privkey ] && [ -e $pubcrt ] && [ -e $chain ]; then
 	-srcstoretype pkcs12 \\
 	-srcstorepass aircontrolenterprise \\
 	-destkeystore /var/lib/unifi/keystore \\
-	-deststoretype pkcs12 \\
 	-deststorepass aircontrolenterprise \\
 	-destkeypass aircontrolenterprise \\
 	-alias unifi -trustcacerts >/dev/null; then

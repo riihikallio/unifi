@@ -1,6 +1,6 @@
 #! /bin/sh
 
-# Version 1.1.1
+# Version 1.2.0
 # This is a startup script for UniFi Controller on Debian based Google Compute Engine instances.
 # For instructions and how-to:  https://metis.fi/en/2018/02/unifi-on-gcp/
 # For comments and code walkthrough:  https://metis.fi/en/2018/02/gcp-unifi-code/
@@ -132,6 +132,9 @@ if (apt-get -qq install -y -t ${release}-backports certbot >/dev/null) || (apt-g
 fi
 unifi=$(dpkg-query -W --showformat='${Status}\n' unifi 2>/dev/null)
 if [ "x${unifi}" != "xinstall ok installed" ]; then
+	if apt-get -qq install -y openjdk-8-jre-headless >/dev/null; then
+		echo "Java 8 installed"
+	fi
 	if apt-get -qq install -y unifi >/dev/null; then
 		echo "Unifi installed"
 	fi

@@ -108,7 +108,7 @@ fi
 # Install stuff
 #
 if [ ! -f /usr/share/misc/apt-upgraded ]; then
-	curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -
+	curl -Lfs https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -
 	apt-get -qq update -y >/dev/null
 	apt-get -qq upgrade -y >/dev/null
 	touch /usr/share/misc/apt-upgraded

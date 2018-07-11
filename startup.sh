@@ -1,6 +1,6 @@
 #! /bin/sh
 
-# Version 1.0.4
+# Version 1.1.0
 # This is a startup script for UniFi Controller on Debian based Google Compute Engine instances.
 # For instructions and how-to:  https://metis.fi/en/2018/02/unifi-on-gcp/
 # For comments and code walkthrough:  https://metis.fi/en/2018/02/gcp-unifi-code/
@@ -107,11 +107,12 @@ fi
 #
 # Install stuff
 #
-if [ ! -f /usr/share/misc/apt-upgraded ]; then
+if [ ! -f /usr/share/misc/apt-upgraded-1 ]; then
 	curl -Lfs https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -
 	apt-get -qq update -y >/dev/null
 	apt-get -qq upgrade -y >/dev/null
-	touch /usr/share/misc/apt-upgraded
+	rm /usr/share/misc/apt-upgraded
+	touch /usr/share/misc/apt-upgraded-1
 	echo "System upgraded"
 fi
 

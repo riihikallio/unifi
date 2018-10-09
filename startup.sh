@@ -252,7 +252,7 @@ if ! pgrep mongod; then
 		if [ -f /var/run/unifi/launcher.looping ]; then rm -f /var/run/unifi/launcher.looping; fi
 		echo >> $LOG
 		echo "Repairing Unifi DB on \$(date)" >> $LOG
-		su -c "/usr/bin/mongod --repair --dbpath /var/lib/unifi/db --logappend --logpath ${MONGOLOG} 2>>$LOG" unifi
+		su -c "/usr/bin/mongod --repair --dbpath /var/lib/unifi/db --smallfiles --logappend --logpath ${MONGOLOG} 2>>$LOG" unifi
 	fi
 else
 	echo "MongoDB is running. Exiting..."

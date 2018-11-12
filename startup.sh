@@ -111,7 +111,7 @@ if [ ! -f /usr/share/misc/apt-upgraded-1 ]; then
 	export APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE=DontWarn
 	curl -Lfs https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -
 	apt-get -qq update -y >/dev/null
-	apt-get -qq upgrade -y >/dev/null
+	DEBIAN_FRONTEND=noninteractive apt-get -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" upgrade -y >/dev/null
 	rm /usr/share/misc/apt-upgraded # Old flag file
 	touch /usr/share/misc/apt-upgraded-1
 	echo "System upgraded"

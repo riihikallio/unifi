@@ -1,6 +1,6 @@
 #! /bin/sh
 
-# Version 1.2.3
+# Version 1.3.0
 # This is a startup script for UniFi Controller on Debian based Google Compute Engine instances.
 # For instructions and how-to:  https://metis.fi/en/2018/02/unifi-on-gcp/
 # For comments and code walkthrough:  https://metis.fi/en/2018/02/gcp-unifi-code/
@@ -376,6 +376,25 @@ Ob8VZRzI9neWagqNdwvYkQsEjgfbKbYK7p2CNTUQ
 -----END CERTIFICATE-----
 _EOF
 fi
+
+# Write pre and post hooks to stop Lighttpd for the renewal
+if [ ! -d /etc/letsencrypt/renewal-hooks/pre ]; then
+	mkdir -p /etc/letsencrypt/renewal-hooks/pre
+fi
+cat > /etc/letsencrypt/renewal-hooks/pre/lighttpd <<_EOF
+#! /bin/sh
+systemctl stop lighttpd
+_EOF
+chmod a+x /etc/letsencrypt/renewal-hooks/pre/lighttpd
+
+if [ ! -d /etc/letsencrypt/renewal-hooks/post ]; then
+	mkdir -p /etc/letsencrypt/renewal-hooks/post
+fi
+cat > /etc/letsencrypt/renewal-hooks/post/lighttpd <<_EOF
+#! /bin/sh
+systemctl start lighttpd
+_EOF
+chmod a+x /etc/letsencrypt/renewal-hooks/post/lighttpd
 
 # Write the deploy hook to import the cert into Java
 if [ ! -d /etc/letsencrypt/renewal-hooks/deploy ]; then

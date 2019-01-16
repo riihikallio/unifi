@@ -1,6 +1,6 @@
 #! /bin/sh
 
-# Version 1.3.0
+# Version 1.3.1
 # This is a startup script for UniFi Controller on Debian based Google Compute Engine instances.
 # For instructions and how-to:  https://metis.fi/en/2018/02/unifi-on-gcp/
 # For comments and code walkthrough:  https://metis.fi/en/2018/02/gcp-unifi-code/
@@ -108,11 +108,12 @@ fi
 # Install stuff
 #
 if [ ! -f /usr/share/misc/apt-upgraded-1 ]; then
-	export APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE=DontWarn
-	curl -Lfs https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -
+	apt-get install apt-transport-https    # UniFi repo may require https
+	export APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE=DontWarn    # For CGP packages
+	curl -Lfs https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -    # For CGP packages
 	apt-get -qq update -y >/dev/null
-	DEBIAN_FRONTEND=noninteractive apt-get -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" upgrade -y >/dev/null
-	rm /usr/share/misc/apt-upgraded # Old flag file
+	DEBIAN_FRONTEND=noninteractive apt-get -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" upgrade -y >/dev/null    # GRUB upgrades require special flags
+	rm /usr/share/misc/apt-upgraded    # Old flag file
 	touch /usr/share/misc/apt-upgraded-1
 	echo "System upgraded"
 fi

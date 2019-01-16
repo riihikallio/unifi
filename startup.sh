@@ -1,6 +1,6 @@
 #! /bin/sh
 
-# Version 1.3.1
+# Version 1.3.3
 # This is a startup script for UniFi Controller on Debian based Google Compute Engine instances.
 # For instructions and how-to:  https://metis.fi/en/2018/02/unifi-on-gcp/
 # For comments and code walkthrough:  https://metis.fi/en/2018/02/gcp-unifi-code/
@@ -82,16 +82,6 @@ fi
 
 ###########################################################
 #
-# Add Unifi to APT sources
-#
-if [ ! -f /etc/apt/trusted.gpg.d/unifi-repo.gpg ]; then
-	echo "deb http://www.ubnt.com/downloads/unifi/debian stable ubiquiti" > /etc/apt/sources.list.d/unifi.list
-	curl -Lfs -o /etc/apt/trusted.gpg.d/unifi-repo.gpg https://dl.ubnt.com/unifi/unifi-repo.gpg
-	echo "Unifi added to APT sources";
-fi
-
-###########################################################
-#
 # Add backports if it doesn't exist
 #
 release=$(lsb_release -a 2>/dev/null | grep "^Codename:" | cut -f 2)
@@ -107,8 +97,9 @@ fi
 #
 # Install stuff
 #
+
+# Required preliminiaries
 if [ ! -f /usr/share/misc/apt-upgraded-1 ]; then
-	apt-get install apt-transport-https    # UniFi repo may require https
 	export APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE=DontWarn    # For CGP packages
 	curl -Lfs https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -    # For CGP packages
 	apt-get -qq update -y >/dev/null
@@ -118,7 +109,7 @@ if [ ! -f /usr/share/misc/apt-upgraded-1 ]; then
 	echo "System upgraded"
 fi
 
-# Simple installs first
+# HAVEGEd is straightforward
 haveged=$(dpkg-query -W --showformat='${Status}\n' haveged 2>/dev/null)
 if [ "x${haveged}" != "xinstall ok installed" ]; then 
 	if apt-get -qq install -y haveged >/dev/null; then
@@ -131,8 +122,15 @@ if (apt-get -qq install -y -t ${release}-backports certbot >/dev/null) || (apt-g
 		echo "CertBot installed"
 	fi
 fi
+
+# UniFi needs a custom repo and APT update first
 unifi=$(dpkg-query -W --showformat='${Status}\n' unifi 2>/dev/null)
 if [ "x${unifi}" != "xinstall ok installed" ]; then
+	apt-get -qq install -y apt-transport-https >/dev/null
+	echo "deb http://www.ubnt.com/downloads/unifi/debian stable ubiquiti" > /etc/apt/sources.list.d/unifi.list
+	curl -Lfs -o /etc/apt/trusted.gpg.d/unifi-repo.gpg https://dl.ubnt.com/unifi/unifi-repo.gpg
+	apt-get -qq update -y >/dev/null
+	
 	if apt-get -qq install -y openjdk-8-jre-headless >/dev/null; then
 		echo "Java 8 installed"
 	fi

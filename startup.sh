@@ -1,6 +1,6 @@
 #! /bin/sh
 
-# Version 1.3.3
+# Version 1.3.4
 # This is a startup script for UniFi Controller on Debian based Google Compute Engine instances.
 # For instructions and how-to:  https://metis.fi/en/2018/02/unifi-on-gcp/
 # For comments and code walkthrough:  https://metis.fi/en/2018/02/gcp-unifi-code/
@@ -123,10 +123,10 @@ if (apt-get -qq install -y -t ${release}-backports certbot >/dev/null) || (apt-g
 	fi
 fi
 
-# UniFi needs a custom repo and APT update first
+# UniFi needs https support, custom repo and APT update first
+apt-get -qq install -y apt-transport-https >/dev/null
 unifi=$(dpkg-query -W --showformat='${Status}\n' unifi 2>/dev/null)
 if [ "x${unifi}" != "xinstall ok installed" ]; then
-	apt-get -qq install -y apt-transport-https >/dev/null
 	echo "deb http://www.ubnt.com/downloads/unifi/debian stable ubiquiti" > /etc/apt/sources.list.d/unifi.list
 	curl -Lfs -o /etc/apt/trusted.gpg.d/unifi-repo.gpg https://dl.ubnt.com/unifi/unifi-repo.gpg
 	apt-get -qq update -y >/dev/null

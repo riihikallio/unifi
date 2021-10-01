@@ -349,6 +349,8 @@ privkey=/etc/letsencrypt/live/${dnsname}/privkey.pem
 pubcrt=/etc/letsencrypt/live/${dnsname}/cert.pem
 chain=/etc/letsencrypt/live/${dnsname}/chain.pem
 caroot=/usr/share/misc/ca_root.pem
+# So we can import the chain, not only the individual certificate. //JJ
+combo=/etc/letsencrypt/live/${dnsname}/combo.pem
 
 # Write the cross signed root certificate to disk
 # Upd: LetsEncrypt cert topology has changed. I added X1 root cert, self-signed, not cross-signed, valid untill 2035. Feedback welcome.//JJ
@@ -421,6 +423,9 @@ if [ -e $privkey ] && [ -e $pubcrt ] && [ -e $chain ]; then
 	echo "Importing new certificate on \$(date)" >> $LOG
 	p12=\$(mktemp)
 	
+	# Preparing combo move of importing a cert chain. //JJ
+	cat $pubcrt $chain $caroot >$combo
+
 	if ! openssl pkcs12 -export \\
 	-in $pubcrt \\
 	-inkey $privkey \\

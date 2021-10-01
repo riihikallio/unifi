@@ -454,6 +454,8 @@ if [ -e $privkey ] && [ -e $pubcrt ] && [ -e $chain ]; then
 		exit 2
 	fi
 	
+	systemctl restart unifi
+	
 # Parking java import command //JJ
 # 	systemctl stop unifi
 #	if ! java -jar /usr/lib/unifi/lib/ace.jar import_cert \\

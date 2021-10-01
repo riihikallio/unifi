@@ -427,7 +427,7 @@ if [ -e $privkey ] && [ -e $pubcrt ] && [ -e $chain ]; then
 	cat $pubcrt $chain $caroot >$combo
 
 	if ! openssl pkcs12 -export \\
-	-in $pubcrt \\
+	-in $combo \\
 	-inkey $privkey \\
 	-CAfile $chain \\
 	-out \${p12} -passout pass:aircontrolenterprise \\

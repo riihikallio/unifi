@@ -408,6 +408,7 @@ _EOF
 chmod a+x /etc/letsencrypt/renewal-hooks/post/lighttpd
 
 # Write the deploy hook to import the cert into Java
+# Upd: remove java interaction and use keytool to perform all import operations. //JJ
 if [ ! -d /etc/letsencrypt/renewal-hooks/deploy ]; then
 	mkdir -p /etc/letsencrypt/renewal-hooks/deploy
 fi
@@ -448,14 +449,16 @@ if [ -e $privkey ] && [ -e $pubcrt ] && [ -e $chain ]; then
 		exit 2
 	fi
 	
-	systemctl stop unifi
-	if ! java -jar /usr/lib/unifi/lib/ace.jar import_cert \\
-	$pubcrt $chain $caroot >/dev/null; then
-		echo "Java import_cert failed" >> $LOG
-		systemctl start unifi
-		exit 3
-	fi
-	systemctl start unifi
+# Parking java import command //JJ
+# 	systemctl stop unifi
+#	if ! java -jar /usr/lib/unifi/lib/ace.jar import_cert \\
+#	$pubcrt $chain $caroot >/dev/null; then
+#		echo "Java import_cert failed" >> $LOG
+#		systemctl start unifi
+#		exit 3
+#	fi
+#   systemctl start unifi
+
 	rm -f \${p12}
 	echo "Success" >> $LOG
 else

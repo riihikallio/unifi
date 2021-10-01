@@ -349,6 +349,8 @@ privkey=/etc/letsencrypt/live/${dnsname}/privkey.pem
 pubcrt=/etc/letsencrypt/live/${dnsname}/cert.pem
 chain=/etc/letsencrypt/live/${dnsname}/chain.pem
 caroot=/usr/share/misc/ca_root.pem
+# Conversion file, easier to debug. //JJ
+p12=/etc/letsencrypt/live/${dnsname}/p12
 # So we can import the chain, not only the individual certificate. //JJ
 combo=/etc/letsencrypt/live/${dnsname}/combo.pem
 
@@ -421,16 +423,16 @@ if [ -e $privkey ] && [ -e $pubcrt ] && [ -e $chain ]; then
 
 	echo >> $LOG
 	echo "Importing new certificate on \$(date)" >> $LOG
-	p12=\$(mktemp)
+	# p12=\$(mktemp)
 	
 	# Preparing combo move of importing a cert chain. //JJ
-	cat $pubcrt $chain $caroot >$combo
+	cat $pubcrt $chain $caroot > $combo
 
 	if ! openssl pkcs12 -export \\
 	-in $combo \\
 	-inkey $privkey \\
 	-CAfile $chain \\
-	-out \${p12} -passout pass:aircontrolenterprise \\
+	-out ${p12} -passout pass:aircontrolenterprise \\
 	-caname root -name unifi >/dev/null ; then
 		echo "OpenSSL export failed" >> $LOG
 		exit 1
@@ -443,7 +445,7 @@ if [ -e $privkey ] && [ -e $pubcrt ] && [ -e $chain ]; then
 	fi
 	
 	if ! keytool -importkeystore \\
-	-srckeystore \${p12} \\
+	-srckeystore ${p12} \\
 	-srcstoretype pkcs12 \\
 	-srcstorepass aircontrolenterprise \\
 	-destkeystore /var/lib/unifi/keystore \\
@@ -466,7 +468,7 @@ if [ -e $privkey ] && [ -e $pubcrt ] && [ -e $chain ]; then
 #	fi
 #   systemctl start unifi
 
-	rm -f \${p12}
+	rm -f ${p12}
 	echo "Success" >> $LOG
 else
 	echo "Certificate files missing" >> $LOG

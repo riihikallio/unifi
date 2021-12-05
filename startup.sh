@@ -1,6 +1,6 @@
 #! /bin/bash
 
-# Version 1.4
+# Version 1.4.1
 # This is a startup script for UniFi Controller on Debian based Google Compute Engine instances.
 # For instructions and how-to:  https://metis.fi/en/2018/02/unifi-on-gcp/
 # For comments and code walkthrough:  https://metis.fi/en/2018/02/gcp-unifi-code/
@@ -461,6 +461,7 @@ if [ -e $privkey ] && [ -e $pubcrt ] && [ -e $chain ]; then
 	fi
 	systemctl start unifi
 	rm -f \${p12}
+	rm -f \${combo}
 	echo "Success" >> $LOG
 else
 	echo "Certificate files missing" >> $LOG

@@ -1,6 +1,6 @@
 #! /bin/bash
 
-# Version 1.4.2
+# Version 1.4.3
 # This is a startup script for UniFi Controller on Debian based Google Compute Engine instances.
 # For instructions and how-to:  https://metis.fi/en/2018/02/unifi-on-gcp/
 # For comments and code walkthrough:  https://metis.fi/en/2018/02/gcp-unifi-code/
@@ -190,8 +190,8 @@ fi
 #
 # APT maintenance (runs only at reboot)
 #
-apt autoremove --purge
-apt clean
+apt -qq autoremove --purge
+apt -qq clean
 curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add -
 
 ###########################################################

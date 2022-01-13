@@ -6,7 +6,7 @@
 # For comments and code walkthrough:  https://metis.fi/en/2018/02/gcp-unifi-code/
 #
 # You may use this as you see fit as long as I am credited for my work.
-# (c) 2018-2021 Petri Riihikallio Metis Oy
+# (c) 2018-2022 Petri Riihikallio Metis Oy
 
 ###########################################################
 #

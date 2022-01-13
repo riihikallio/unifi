@@ -1,6 +1,6 @@
 #! /bin/bash
 
-# Version 1.4.3
+# Version 1.4.4
 # This is a startup script for UniFi Controller on Debian based Google Compute Engine instances.
 # For instructions and how-to:  https://metis.fi/en/2018/02/unifi-on-gcp/
 # For comments and code walkthrough:  https://metis.fi/en/2018/02/gcp-unifi-code/
@@ -426,7 +426,7 @@ if [ -e $privkey ] && [ -e $pubcrt ] && [ -e $chain ]; then
 	
 	p12=\$(mktemp)
 	combo=\$(mktemp)
-	cat $pubcrt <(echo) $chain <(echo) $chroot > \${combo}
+	cat $pubcrt <(echo) $chain <(echo) $caroot > \${combo}
 	
 	if ! openssl pkcs12 -export \\
 	-in \${combo} \\

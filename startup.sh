@@ -1,6 +1,6 @@
 #! /bin/bash
 
-# Version 1.4.4
+# Version 1.4.5
 # This is a startup script for UniFi Controller on Debian based Google Compute Engine instances.
 # For instructions and how-to:  https://metis.fi/en/2018/02/unifi-on-gcp/
 # For comments and code walkthrough:  https://metis.fi/en/2018/02/gcp-unifi-code/
@@ -201,11 +201,12 @@ curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add -
 tz=$(curl -fs -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/attributes/timezone")
 if [ ${tz} ] && [ -f /usr/share/zoneinfo/${tz} ]; then
 	apt-get -qq install -y dbus >/dev/null
-	if ! systemctl start dbus; then
+	while [ ! systemctl start dbus ]
+	do
 		echo "Trying to start dbus"
 		sleep 15
 		systemctl start dbus
-	fi
+	done
 	if timedatectl set-timezone $tz; then echo "Localtime set to ${tz}"; fi
 	systemctl reload-or-restart rsyslog
 fi

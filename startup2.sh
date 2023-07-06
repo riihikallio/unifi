@@ -1,12 +1,12 @@
 #! /bin/bash
 
-# Version 1.4.5
+# Version 2.0.0
 # This is a startup script for UniFi Controller on Debian based Google Compute Engine instances.
 # For instructions and how-to:  https://metis.fi/en/2018/02/unifi-on-gcp/
 # For comments and code walkthrough:  https://metis.fi/en/2018/02/gcp-unifi-code/
 #
 # You may use this as you see fit as long as I am credited for my work.
-# (c) 2018-2022 Petri Riihikallio Metis Oy
+# (c) 2018-2023 Petri Riihikallio Metis Oy
 
 ###########################################################
 #

@@ -301,7 +301,7 @@ After=network-online.target
 Wants=network-online.target
 [Service]
 Type=oneshot
-ExecStart=/usr/bin/gsutil rsync -r -d /var/lib/unifi/backup gs://$bucket
+ExecStart=/usr/bin/gsutil rsync -C -r -d /var/lib/unifi/backup gs://$bucket
 _EOF
 
 	cat > /etc/systemd/system/unifi-backup.timer <<_EOF

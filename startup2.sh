@@ -76,6 +76,7 @@ if [ ! -f /swapfile ]; then
 		echo '/swapfile none swap sw 0 0' >> /etc/fstab
 		echo 'tmpfs /run tmpfs rw,nodev,nosuid,size=400M 0 0' >> /etc/fstab
 		mount -o remount,rw,nodev,nosuid,size=400M tmpfs /run
+		systemctl daemon-reload
 		echo "Swap file created"
 	fi
 fi
@@ -84,61 +85,62 @@ fi
 #
 # Add backports if it doesn't exist
 #
-release=$(lsb_release -a 2>/dev/null | grep "^Codename:" | cut -f 2)
-if [ ${release} ] && [ ! -f /etc/apt/sources.list.d/backports.list ]; then
-	cat > /etc/apt/sources.list.d/backports.list <<_EOF
-deb http://deb.debian.org/debian/ ${release}-backports main
-deb-src http://deb.debian.org/debian/ ${release}-backports main
-_EOF
-	echo "Backports (${release}) added to APT sources"
-fi
-
+# release=$(lsb_release -a 2>/dev/null | grep "^Codename:" | cut -f 2)
+# if [ ${release} ] && [ ! -f /etc/apt/sources.list.d/backports.list ]; then
+# 	cat > /etc/apt/sources.list.d/backports.list <<_EOF
+# deb http://deb.debian.org/debian/ ${release}-backports main
+# deb-src http://deb.debian.org/debian/ ${release}-backports main
+# _EOF
+# 	echo "Backports (${release}) added to APT sources"
+# fi
+#
 ###########################################################
 #
 # Install stuff
 #
 
 # Required preliminiaries
-if [ ! -f /usr/share/misc/apt-upgraded-1 ]; then
-	export APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE=DontWarn    # For CGP packages
-	curl -Lfs https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -    # For CGP packages
+if [ ! -f /usr/share/misc/apt-upgraded ]; then
+	dpkg --configure -a
 	apt-get -qq update -y >/dev/null
+	apt -qq remove -y man-db >/dev/null
 	DEBIAN_FRONTEND=noninteractive apt-get -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" upgrade -y >/dev/null    # GRUB upgrades require special flags
-	rm /usr/share/misc/apt-upgraded    # Old flag file
-	touch /usr/share/misc/apt-upgraded-1
+	touch /usr/share/misc/apt-upgraded
 	echo "System upgraded"
 fi
 
-# HAVEGEd is straightforward
+# HAVEGEd should be installed by default
 haveged=$(dpkg-query -W --showformat='${Status}\n' haveged 2>/dev/null)
 if [ "x${haveged}" != "xinstall ok installed" ]; then 
 	if apt-get -qq install -y haveged >/dev/null; then
 		echo "Haveged installed"
 	fi
 fi
+
+# CertBot is straightforward, too
 certbot=$(dpkg-query -W --showformat='${Status}\n' certbot 2>/dev/null)
 if [ "x${certbot}" != "xinstall ok installed" ]; then
-if (apt-get -qq install -y -t ${release}-backports certbot >/dev/null) || (apt-get -qq install -y certbot >/dev/null); then
+if (apt-get -qq install -y certbot >/dev/null); then
 		echo "CertBot installed"
 	fi
 fi
 
 # UniFi needs https support, custom repo and APT update first
-apt-get -qq install -y apt-transport-https >/dev/null
 unifi=$(dpkg-query -W --showformat='${Status}\n' unifi 2>/dev/null)
 if [ "x${unifi}" != "xinstall ok installed" ]; then
-	echo "deb http://www.ubnt.com/downloads/unifi/debian stable ubiquiti" > /etc/apt/sources.list.d/unifi.list
-	curl -Lfs -o /etc/apt/trusted.gpg.d/unifi-repo.gpg https://dl.ubnt.com/unifi/unifi-repo.gpg
+	apt-get -qq install -y ca-certificates apt-transport-https gnupg >/dev/null
+	curl -fsSL https://www.mongodb.org/static/pgp/server-3.6.asc | gpg -o /usr/share/keyrings/mongodb-server-3.6.gpg --dearmor
+	echo "deb [ signed-by=/usr/share/keyrings/mongodb-server-3.6.gpg ] http://repo.mongodb.org/apt/debian stretch/mongodb-org/3.6 main" > /etc/apt/sources.list.d/mongodb-org-3.6.list
+	curl -Lfs -o /usr/share/keyrings/unifi-repo.gpg https://dl.ubnt.com/unifi/unifi-repo.gpg
+	echo "deb [ signed-by=/usr/share/keyrings/unifi-repo.gpg ] http://www.ubnt.com/downloads/unifi/debian stable ubiquiti" > /etc/apt/sources.list.d/unifi.list
 	apt-get -qq update -y >/dev/null
 	
-	if apt-get -qq install -y openjdk-8-jre-headless >/dev/null; then
-		echo "Java 8 installed"
+	if apt-get -qq install -y openjdk-11-jre-headless >/dev/null; then
+		echo "Java 11 installed"
 	fi
 	if apt-get -qq install -y unifi >/dev/null; then
 		echo "Unifi installed"
 	fi
-	systemctl stop mongodb
-	systemctl disable mongodb
 fi
 
 # Lighttpd needs a config file and a reload
@@ -190,9 +192,8 @@ fi
 #
 # APT maintenance (runs only at reboot)
 #
-apt -qq autoremove --purge
+apt -qq autoremove -y --purge
 apt -qq clean
-curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add -
 
 ###########################################################
 #
@@ -202,7 +203,7 @@ tz=$(curl -fs -H "Metadata-Flavor: Google" "http://metadata.google.internal/comp
 if [ ${tz} ] && [ -f /usr/share/zoneinfo/${tz} ]; then
 	apt-get -qq install -y dbus >/dev/null
 	let rounds=0
-	while [ ! systemctl start dbus && $rounds -lt 12 ]
+	while ! systemctl start dbus && [ $rounds -lt 12 ]
 	do
 		echo "Trying to start dbus"
 		sleep 15

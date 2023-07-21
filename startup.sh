@@ -201,11 +201,13 @@ curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add -
 tz=$(curl -fs -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/attributes/timezone")
 if [ ${tz} ] && [ -f /usr/share/zoneinfo/${tz} ]; then
 	apt-get -qq install -y dbus >/dev/null
-	while [ ! systemctl start dbus ]
+	let rounds=0
+	while [ ! systemctl start dbus && $rounds -lt 12 ]
 	do
 		echo "Trying to start dbus"
 		sleep 15
 		systemctl start dbus
+		let rounds++
 	done
 	if timedatectl set-timezone $tz; then echo "Localtime set to ${tz}"; fi
 	systemctl reload-or-restart rsyslog

@@ -3,7 +3,7 @@
 # Version 2.0.0
 # This is a startup script for UniFi Controller on Debian based Google Compute Engine instances.
 # For instructions and how-to:  https://metis.fi/en/2018/02/unifi-on-gcp/
-# For comments and code walkthrough:  https://metis.fi/en/2018/02/gcp-unifi-code/
+# For comments and (older) code walkthrough:  https://metis.fi/en/2018/02/gcp-unifi-code/
 #
 # You may use this as you see fit as long as I am credited for my work.
 # (c) 2018-2023 Petri Riihikallio Metis Oy
@@ -11,7 +11,7 @@
 ###########################################################
 #
 # Set up logging for unattended scripts and UniFi's MongoDB log
-# Variables $LOG and $MONGOLOG are used later on in the script.
+# Variables $LOG and $MONGOLOG are also used later on in the script.
 #
 LOG="/var/log/unifi/gcp-unifi.log"
 if [ ! -f /etc/logrotate.d/gcp-unifi.conf ]; then
@@ -83,19 +83,6 @@ fi
 
 ###########################################################
 #
-# Add backports if it doesn't exist
-#
-# release=$(lsb_release -a 2>/dev/null | grep "^Codename:" | cut -f 2)
-# if [ ${release} ] && [ ! -f /etc/apt/sources.list.d/backports.list ]; then
-# 	cat > /etc/apt/sources.list.d/backports.list <<_EOF
-# deb http://deb.debian.org/debian/ ${release}-backports main
-# deb-src http://deb.debian.org/debian/ ${release}-backports main
-# _EOF
-# 	echo "Backports (${release}) added to APT sources"
-# fi
-#
-###########################################################
-#
 # Install stuff
 #
 
@@ -125,19 +112,23 @@ if (apt-get -qq install -y certbot >/dev/null); then
 	fi
 fi
 
-# UniFi needs https support, custom repo and APT update first
+# UniFi needs https support, custom repos and APT update first
 unifi=$(dpkg-query -W --showformat='${Status}\n' unifi 2>/dev/null)
 if [ "x${unifi}" != "xinstall ok installed" ]; then
 	apt-get -qq install -y ca-certificates apt-transport-https gnupg >/dev/null
-	curl -fsSL https://www.mongodb.org/static/pgp/server-3.6.asc | gpg -o /usr/share/keyrings/mongodb-server-3.6.gpg --dearmor
-	echo "deb [ signed-by=/usr/share/keyrings/mongodb-server-3.6.gpg ] http://repo.mongodb.org/apt/debian stretch/mongodb-org/3.6 main" > /etc/apt/sources.list.d/mongodb-org-3.6.list
-	curl -Lfs -o /usr/share/keyrings/unifi-repo.gpg https://dl.ubnt.com/unifi/unifi-repo.gpg
-	echo "deb [ signed-by=/usr/share/keyrings/unifi-repo.gpg ] http://www.ubnt.com/downloads/unifi/debian stable ubiquiti" > /etc/apt/sources.list.d/unifi.list
+	curl -fsSL https://www.mongodb.org/static/pgp/server-3.6.asc | gpg -o /etc/apt/trusted.gpg.d/mongodb-server-3.6.gpg --dearmor
+	echo "deb [ signed-by=/etc/apt/trusted.gpg.d/mongodb-server-3.6.gpg ] http://repo.mongodb.org/apt/debian stretch/mongodb-org/3.6 main" > /etc/apt/sources.list.d/mongodb-org-3.6.list
+	curl -Lfs -o /etc/apt/trusted.gpg.d/unifi-repo.gpg https://dl.ubnt.com/unifi/unifi-repo.gpg
+	echo "deb [ signed-by=/etc/apt/trusted.gpg.d/unifi-repo.gpg ] http://www.ubnt.com/downloads/unifi/debian stable ubiquiti" > /etc/apt/sources.list.d/unifi.list
 	apt-get -qq update -y >/dev/null
 	
 	if apt-get -qq install -y openjdk-11-jre-headless >/dev/null; then
 		echo "Java 11 installed"
 	fi
+	if apt-get -qq install -y mongodb-org-server >/dev/null; then
+		echo "MongoDB installed"
+	fi
+	mongodb-org-server
 	if apt-get -qq install -y unifi >/dev/null; then
 		echo "Unifi installed"
 	fi

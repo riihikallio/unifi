@@ -128,7 +128,6 @@ if [ "x${unifi}" != "xinstall ok installed" ]; then
 	if apt-get -qq install -y mongodb-org-server >/dev/null; then
 		echo "MongoDB installed"
 	fi
-	mongodb-org-server
 	if apt-get -qq install -y unifi >/dev/null; then
 		echo "Unifi installed"
 	fi

@@ -1,6 +1,6 @@
 #! /bin/bash
 
-# Version 2.0.0
+# Version 2.0.1
 # This is a startup script for UniFi Controller on Debian based Google Compute Engine instances.
 # For instructions and how-to:  https://metis.fi/en/2018/02/unifi-on-gcp/
 # For comments and (older) code walkthrough:  https://metis.fi/en/2018/02/gcp-unifi-code/
@@ -57,7 +57,7 @@ fi
 #
 ddns=$(curl -fs -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/attributes/ddns-url")
 if [ ${ddns} ]; then
-	curl -fs ${ddns}
+	curl -fsS ${ddns}
 	echo "Dynamic DNS accessed"
 fi
 
@@ -96,7 +96,11 @@ if [ ! -f /usr/share/misc/apt-upgraded ]; then
 	echo "System upgraded"
 fi
 
-# HAVEGEd should be installed by default
+# Unattended-upgrades won't upgrade UniFi over Codename changes
+# This will be run at every reboot, but also requires reboot to be run
+apt-get -qq update -y --allow-releaseinfo-change >/dev/null
+
+# HAVEGEd should be now installed by default
 haveged=$(dpkg-query -W --showformat='${Status}\n' haveged 2>/dev/null)
 if [ "x${haveged}" != "xinstall ok installed" ]; then 
 	if apt-get -qq install -y haveged >/dev/null; then
@@ -116,9 +120,9 @@ fi
 unifi=$(dpkg-query -W --showformat='${Status}\n' unifi 2>/dev/null)
 if [ "x${unifi}" != "xinstall ok installed" ]; then
 	apt-get -qq install -y ca-certificates apt-transport-https gnupg >/dev/null
-	curl -fsSL https://www.mongodb.org/static/pgp/server-3.6.asc | gpg -o /etc/apt/trusted.gpg.d/mongodb-server-3.6.gpg --dearmor
+	curl -LfsS https://www.mongodb.org/static/pgp/server-3.6.asc | gpg -o /etc/apt/trusted.gpg.d/mongodb-server-3.6.gpg --dearmor
 	echo "deb [ signed-by=/etc/apt/trusted.gpg.d/mongodb-server-3.6.gpg ] http://repo.mongodb.org/apt/debian stretch/mongodb-org/3.6 main" > /etc/apt/sources.list.d/mongodb-org-3.6.list
-	curl -Lfs -o /etc/apt/trusted.gpg.d/unifi-repo.gpg https://dl.ubnt.com/unifi/unifi-repo.gpg
+	curl -LfsS -o /etc/apt/trusted.gpg.d/unifi-repo.gpg https://dl.ubnt.com/unifi/unifi-repo.gpg
 	echo "deb [ signed-by=/etc/apt/trusted.gpg.d/unifi-repo.gpg ] http://www.ubnt.com/downloads/unifi/debian stable ubiquiti" > /etc/apt/sources.list.d/unifi.list
 	apt-get -qq update -y >/dev/null
 	
@@ -189,7 +193,7 @@ apt -qq clean
 #
 # Set the time zone
 #
-tz=$(curl -fs -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/attributes/timezone")
+tz=$(curl -fsS -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/attributes/timezone")
 if [ ${tz} ] && [ -f /usr/share/zoneinfo/${tz} ]; then
 	apt-get -qq install -y dbus >/dev/null
 	let rounds=0

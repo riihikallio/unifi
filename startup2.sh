@@ -1,6 +1,6 @@
 #! /bin/bash
 
-# Version 2.0.1
+# Version 2.0.1a
 # This is a startup script for UniFi Controller on Debian based Google Compute Engine instances.
 # For instructions and how-to:  https://metis.fi/en/2018/02/unifi-on-gcp/
 # For comments and (older) code walkthrough:  https://metis.fi/en/2018/02/gcp-unifi-code/
@@ -391,6 +391,8 @@ mUlO+KWA2yUPHGNiiskzZ2s8EIPGrd6ozRaOjfAHN3Gf8qv8QfXBi+wAN10J5U6A
 -----END CERTIFICATE-----
 _EOF
 
+rulename=$(curl -fs -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/attributes/rule-name")
+
 # Write pre and post hooks to stop Lighttpd for the renewal
 if [ ! -d /etc/letsencrypt/renewal-hooks/pre ]; then
 	mkdir -p /etc/letsencrypt/renewal-hooks/pre
@@ -409,6 +411,11 @@ cat > /etc/letsencrypt/renewal-hooks/post/lighttpd <<_EOF
 systemctl start lighttpd
 _EOF
 chmod a+x /etc/letsencrypt/renewal-hooks/post/lighttpd
+
+if [ -n ${rulename} ]; then 
+	echo "gcloud compute firewall-rules update ${rulename} --no-disabled" >> /etc/letsencrypt/renewal-hooks/pre/lighttpd
+	sed -i "s/systemctl/gcloud compute firewall-rules update ${rulename} --disabled\nsystemctl/g" /etc/letsencrypt/renewal-hooks/post/lighttpd
+fi
 
 # Write the deploy hook to import the cert into Java
 if [ ! -d /etc/letsencrypt/renewal-hooks/deploy ]; then
@@ -482,11 +489,11 @@ echo >> $LOG
 echo "CertBot run on \$(date)" >> $LOG
 if [ x\${extIP} = x\${dnsIP} ]; then
 	if [ ! -d /etc/letsencrypt/live/${dnsname} ]; then
-		systemctl stop lighttpd
+		/etc/letsencrypt/renewal-hooks/pre/lighttpd
 		if certbot certonly -d $dnsname --standalone --agree-tos --register-unsafely-without-email >> $LOG; then
 			echo "Received certificate for ${dnsname}" >> $LOG
 		fi
-		systemctl start lighttpd
+		/etc/letsencrypt/renewal-hooks/post/lighttpd
 	fi
 	if /etc/letsencrypt/renewal-hooks/deploy/unifi; then
 		systemctl stop certbotrun.timer

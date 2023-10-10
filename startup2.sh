@@ -1,6 +1,6 @@
 #! /bin/bash
 
-# Version 2.0.1
+# Version 2.0.2
 # This is a startup script for UniFi Controller on Debian based Google Compute Engine instances.
 # For instructions and how-to:  https://metis.fi/en/2018/02/unifi-on-gcp/
 # For comments and (older) code walkthrough:  https://metis.fi/en/2018/02/gcp-unifi-code/
@@ -270,7 +270,7 @@ _EOF
 	cat > /etc/systemd/system/unifidb-repair.service <<_EOF
 [Unit]
 Description=Repair UniFi MongoDB database at boot
-Before=unifi.service mongodb.service
+Before=unifi.service mongod.service
 After=network-online.target
 Wants=network-online.target
 [Service]

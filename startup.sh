@@ -116,6 +116,14 @@ if [ "x${haveged}" != "xinstall ok installed" ]; then
 		echo "Haveged installed"
 	fi
 fi
+
+hostPackage=$(dpkg-query -W --showformat='${Status}\n' host 2>/dev/null)
+if [ "x${hostPackage}" != "xinstall ok installed" ]; then 
+	if apt-get -qq install -y host >/dev/null; then
+		echo "Host package installed"
+	fi
+fi
+
 certbot=$(dpkg-query -W --showformat='${Status}\n' certbot 2>/dev/null)
 if [ "x${certbot}" != "xinstall ok installed" ]; then
 if (apt-get -qq install -y -t ${release}-backports certbot >/dev/null) || (apt-get -qq install -y certbot >/dev/null); then
@@ -481,7 +489,7 @@ chmod a+x /etc/letsencrypt/renewal-hooks/deploy/unifi
 cat > /usr/local/sbin/certbotrun.sh <<_EOF
 #! /bin/sh
 extIP=\$(curl -fs -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip")
-dnsIP=\$(getent hosts ${dnsname} | cut -d " " -f 1)
+dnsIP=\$(host ${dnsname} | cut -d " " -f 4)
 
 echo >> $LOG
 echo "CertBot run on \$(date)" >> $LOG
